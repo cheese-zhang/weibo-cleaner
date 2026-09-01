@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>微博清理工具</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: oklch(25% 0.025 255);
+      --muted: oklch(52% 0.035 255);
+      --soft: oklch(66% 0.025 255);
+      --line: oklch(88% 0.025 255);
+      --panel: oklch(99% 0.004 255);
+      --canvas: oklch(96% 0.014 255);
+      --rail: oklch(23% 0.04 255);
+      --rail-muted: oklch(77% 0.03 255);
+      --accent: oklch(59% 0.19 255);
+      --accent-strong: oklch(51% 0.2 255);
+      --accent-soft: oklch(94% 0.045 255);
+      --success: oklch(55% 0.15 154);
+      --warning: oklch(60% 0.15 68);
+      --danger: oklch(55% 0.18 25);
+      --shadow: 0 20px 55px oklch(35% 0.04 255 / 0.10);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; color: var(--ink); background: var(--canvas); font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; line-height: 1.5; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .52; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+    .rail { padding: 28px 22px; color: white; background: var(--rail); display: flex; flex-direction: column; }
+    .brand { display: flex; align-items: center; gap: 11px; font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: var(--rail); background: #fff; font-weight: 900; }
+    .rail-copy { margin: 52px 0 0; color: var(--rail-muted); font-size: 13px; }
+    .rail-note { margin-top: auto; padding-top: 24px; color: var(--rail-muted); font-size: 12px; }
+    .rail-note strong { display: block; margin-bottom: 6px; color: white; font-size: 13px; }
+    main { width: min(1060px, 100%); margin: 0 auto; padding: 48px clamp(22px, 5vw, 72px) 64px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 56px; }
+    .eyebrow { color: var(--accent-strong); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+    .privacy { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+    .privacy-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+    h1 { max-width: 620px; margin: 0; font-size: clamp(30px, 4vw, 49px); line-height: 1.08; letter-spacing: -.045em; text-wrap: balance; }
+    .lede { max-width: 580px; margin: 18px 0 0; color: var(--muted); font-size: 16px; }
+    .flow { display: flex; align-items: center; gap: 10px; margin: 32px 0; color: var(--soft); font-size: 12px; font-weight: 700; }
+    .flow-item { display: flex; align-items: center; gap: 8px; }
+    .flow-number { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); color: var(--soft); }
+    .flow-item.active { color: var(--accent-strong); }
+    .flow-item.active .flow-number { border-color: var(--accent); color: white; background: var(--accent); }
+    .flow-line { width: 35px; height: 1px; background: var(--line); }
+    .panel { border: 1px solid var(--line); border-radius: 20px; background: var(--panel); box-shadow: var(--shadow); }
+    .panel-head { padding: 25px 28px 20px; border-bottom: 1px solid var(--line); }
+    .panel-head h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+    .panel-head p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .panel-body { padding: 28px; }
+    .login-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(230px, .8fr); gap: 18px; }
+    .login-action { padding: 24px; border-radius: 14px; background: var(--accent-soft); }
+    .login-action h3, .manual h3 { margin: 0 0 8px; font-size: 16px; }
+    .login-action p, .manual p { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+    .button { min-height: 42px; border: 0; border-radius: 10px; padding: 0 16px; font-weight: 700; transition: background .18s ease, transform .18s ease; }
+    .button:hover:not(:disabled) { transform: translateY(-1px); }
+    .button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid oklch(70% .16 255 / .35); outline-offset: 2px; }
+    .button-primary { color: white; background: var(--accent); }
+    .button-primary:hover:not(:disabled) { background: var(--accent-strong); }
+    .button-quiet { color: var(--ink); border: 1px solid var(--line); background: white; }
+    .button-danger { color: white; background: var(--danger); }
+    .manual { padding: 24px; border: 1px solid var(--line); border-radius: 14px; }
+    details summary { color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 700; }
+    .manual-fields { display: grid; gap: 12px; margin-top: 17px; }
+    label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    input, textarea { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; color: var(--ink); background: white; }
+    textarea { min-height: 92px; resize: vertical; font-size: 12px; }
+    .account { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 18px; border: 1px solid oklch(78% .09 154); border-radius: 12px; background: oklch(96% .035 154); }
+    .account-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .account-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--success); font-weight: 800; }
+    .account strong { display: block; font-size: 14px; }
+    .account span { display: block; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .uid-fallback { display: none; width: 180px; margin-top: 5px; padding: 5px 8px; font-size: 12px; }
+    .section { margin-top: 18px; }
+    .section-label { margin: 0 0 11px; font-size: 13px; font-weight: 800; }
+    .mode-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mode { flex: 1 1 145px; min-height: 48px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: white; text-align: left; padding: 10px 13px; }
+    .mode strong { display: block; color: var(--ink); font-size: 13px; }
+    .mode small { display: block; margin-top: 2px; font-size: 11px; }
+    .mode.selected { border-color: var(--accent); background: var(--accent-soft); }
+    .mode.selected strong { color: var(--accent-strong); }
+    .range-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); }
+    .hint { color: var(--muted); font-size: 12px; }
+    .status { margin-top: 18px; padding: 18px; border-radius: 12px; background: oklch(97% .008 255); }
+    .status-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+    .status-row + .status-row { margin-top: 8px; }
+    .status-label { color: var(--muted); }
+    .progress { height: 8px; overflow: hidden; margin: 15px 0 10px; border-radius: 99px; background: var(--line); }
+    .progress-bar { width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width .25s ease; }
+    .logs { max-height: 130px; overflow: auto; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }
+    .logs div + div { margin-top: 4px; }
+    .notice { margin-top: 16px; padding: 12px 14px; border-radius: 9px; color: oklch(40% .08 68); background: oklch(95% .04 68); font-size: 12px; }
+    .error { color: var(--danger); }
+    .hidden { display: none !important; }
+    @media (max-width: 760px) {
+      .app { display: block; }
+      .rail { min-height: auto; padding: 17px 20px; }
+      .rail-copy, .rail-note { display: none; }
+      main { padding: 30px 16px 44px; }
+      .topline { margin-bottom: 38px; }
+      .login-grid { grid-template-columns: 1fr; }
+      .panel-body, .panel-head { padding-left: 19px; padding-right: 19px; }
+      .form-actions { align-items: stretch; flex-direction: column; }
+      .form-actions .button { width: 100%; }
+      .range-fields { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">W</span><span>微博清理工具</span></div>
+      <p class="rail-copy">给自己的微博做一次有边界的整理。范围、进度和限制，都会在执行前说清楚。</p>
+      <div class="rail-note"><strong>本地运行</strong>不会上传或保存你的 Cookie。关闭程序后，本次登录态随进程一起清除。</div>
+    </aside>
+    <main>
+      <div class="topline"><span class="eyebrow">PERSONAL ARCHIVE / 01</span><span class="privacy"><i class="privacy-dot"></i> Cookie 仅存内存</span></div>
+      <h1>清理你的微博，<br>先看清，再动手。</h1>
+      <p class="lede">扫码登录后，工具会先读取可获取的微博数量，再按照你选择的范围执行。删除是不可逆的，所以每一步都有确认。</p>
+      <div class="flow" aria-label="使用步骤">
+        <span class="flow-item active" id="flow-login"><i class="flow-number">1</i> 登录</span><i class="flow-line"></i>
+        <span class="flow-item" id="flow-scope"><i class="flow-number">2</i> 选范围</span><i class="flow-line"></i>
+        <span class="flow-item" id="flow-done"><i class="flow-number">3</i> 清理</span>
+      </div>
+
+      <section class="panel" id="login-panel">
+        <div class="panel-head"><h2>连接你的微博账号</h2><p>扫码会在独立浏览器窗口完成，页面本身不会读取你的密码。</p></div>
+        <div class="panel-body">
+          <div class="login-grid">
+            <div class="login-action">
+              <h3>扫码登录</h3>
+              <p id="login-message">点击后会打开微博登录窗口，用手机微博扫一扫即可。</p>
+              <button class="button button-primary" id="qr-button" type="button">打开扫码窗口</button>
+            </div>
+            <div class="manual">
+              <details>
+                <summary>我已有 Cookie，手动连接</summary>
+                <div class="manual-fields">
+                  <label>微博 UID<input id="manual-uid" inputmode="numeric" placeholder="例如 7910373640"></label>
+                  <label>Cookie<textarea id="manual-cookie" placeholder="粘贴完整 Cookie 字符串"></textarea></label>
+                  <button class="button button-quiet" id="manual-button" type="button">连接账号</button>
+                  <p>Cookie 不会写入文件。若提示缺少 XSRF-TOKEN，请重新复制完整登录态。</p>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div class="notice hidden" id="login-error"></div>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="cleanup-panel">
+        <div class="panel-head"><h2>选择清理范围</h2><p>先预览数量；确认后，才会开始逐条删除。</p></div>
+        <div class="panel-body">
+          <div class="account"><div class="account-main"><div class="account-icon">✓</div><div><strong>微博账号已连接</strong><span id="account-uid">UID 自动识别中</span><input class="uid-fallback" id="account-uid-input" inputmode="numeric" placeholder="补充微博 UID"></div></div><button class="button button-quiet" id="reset-button" type="button">重新登录</button></div>
+          <div class="section"><p class="section-label">我要清理</p><div class="mode-tabs">
+            <button class="mode selected" data-mode="all" type="button"><strong>全部微博</strong><small>清空当前接口可获取的内容</small></button>
+            <button class="mode" data-mode="before" type="button"><strong>某月之前</strong><small>例如：2024 年 1 月之前</small></button>
+            <button class="mode" data-mode="range" type="button"><strong>自定义时间段</strong><small>精确到某一天</small></button>
+          </div></div>
+          <div class="range-fields hidden" id="before-field"><label>清理这个月份之前<input id="before-month" type="month"></label><span></span></div>
+          <div class="range-fields hidden" id="range-fields"><label>开始日期<input id="since" type="date" required></label><label>结束日期<input id="until" type="date" required></label></div>
+          <div class="form-actions"><span class="hint">建议保持默认速度，减少触发微博风控的可能。</span><button class="button button-primary" id="preview-button" type="button">先预览清理数量</button></div>
+          <div class="status hidden" id="task-status" aria-live="polite"><div class="status-row"><span class="status-label" id="task-phase">准备中</span><strong id="task-count">0 条</strong></div><div class="progress"><div class="progress-bar" id="progress-bar"></div></div><div class="status-row"><span class="status-label" id="task-scan">等待扫描</span><span id="task-limit"></span></div><div class="logs" id="logs"></div><div class="form-actions hidden" id="delete-actions"><span class="hint" id="delete-summary"></span><button class="button button-danger" id="delete-button" type="button">确认并开始删除</button></div></div>
+          <div class="notice hidden" id="task-error"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let mode = "all";
+    let lastPreview = null;
+    let pollTimer = null;
+    let loginTimer = null;
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "请求失败");
+      return data;
+    }
+    function body() {
+      const payload = { mode, confirm: false, delay: 1.5 };
+      if (mode === "before") payload.before = $("before-month").value;
+      if (mode === "range") { payload.since = $("since").value; payload.until = $("until").value; }
+      return payload;
+    }
+    function showLoginError(message) { $("login-error").textContent = message; $("login-error").classList.remove("hidden"); }
+    function setLoggedIn(data) {
+      clearInterval(loginTimer);
+      $("login-panel").classList.add("hidden"); $("cleanup-panel").classList.remove("hidden");
+      $("account-uid").textContent = data.uid ? `UID ${data.uid} · 已提取登录 Cookie` : "已提取登录 Cookie，请补充 UID";
+      $("account-uid-input").style.display = data.uid ? "none" : "block";
+      $("flow-login").classList.remove("active"); $("flow-scope").classList.add("active");
+      if (data.uid) { $("manual-uid").value = data.uid; }
+    }
+    async function refreshLogin() {
+      try {
+        const data = await api("/api/login/status");
+        $("login-message").textContent = data.message || "等待登录";
+        if (data.status === "ready") setLoggedIn(data);
+        if (data.status === "error") { clearInterval(loginTimer); $("qr-button").disabled = false; showLoginError(data.message); }
+      } catch (error) { showLoginError(error.message); }
+    }
+    function startLoginPolling() {
+      clearInterval(loginTimer); loginTimer = setInterval(refreshLogin, 1000); refreshLogin();
+    }
+    $("qr-button").addEventListener("click", async () => {
+      $("qr-button").disabled = true; $("login-error").classList.add("hidden");
+      try {
+        await api("/api/login/start", { method: "POST", body: "{}" });
+        startLoginPolling();
+      } catch (error) { $("qr-button").disabled = false; showLoginError(error.message); }
+    });
+    $("manual-button").addEventListener("click", async () => {
+      try {
+        await api("/api/login/manual", { method: "POST", body: JSON.stringify({ uid: $("manual-uid").value, cookie: $("manual-cookie").value }) });
+        setLoggedIn(await api("/api/login/status"));
+      } catch (error) { showLoginError(error.message); }
+    });
+    $("reset-button").addEventListener("click", () => location.reload());
+    document.querySelectorAll(".mode").forEach((button) => button.addEventListener("click", () => {
+      mode = button.dataset.mode; document.querySelectorAll(".mode").forEach((item) => item.classList.toggle("selected", item === button));
+      $("before-field").classList.toggle("hidden", mode !== "before"); $("range-fields").classList.toggle("hidden", mode !== "range");
+    }));
+    $("since").addEventListener("change", () => { $("until").min = $("since").value; });
+    function renderTask(task) {
+      $("task-status").classList.remove("hidden");
+      const isDeleting = task.phase === "deleting";
+      const count = isDeleting ? `${task.success || 0} / ${task.selected || 0} 条` : `${task.selected || task.scanned || 0} 条`;
+      $("task-count").textContent = count;
+      $("task-phase").textContent = task.status === "error" ? "任务出错" : task.status === "completed" && task.phase === "preview" ? "预览完成" : isDeleting ? "正在删除" : task.status === "completed" ? "已完成" : "正在扫描";
+      const base = task.total ? Math.min(100, (task.scanned / task.total) * 100) : Math.min(92, (task.page || 0) / 5);
+      const deletion = isDeleting && task.selected ? (task.success / task.selected) * 100 : 0;
+      $("progress-bar").style.width = `${Math.max(base, deletion)}%`;
+      $("task-scan").textContent = task.pages ? `已读取 ${task.pages} 页 · ${task.scanned} 条` : "正在建立连接…";
+      $("task-limit").textContent = task.hit_limit ? "已达到 500 页读取上限，可能还有未读取内容" : task.partial ? `接口报告约 ${task.total} 条，当前结果可能不完整` : task.total ? `接口报告约 ${task.total} 条` : "";
+      $("logs").innerHTML = (task.logs || []).map((line) => `<div>${escapeHtml(line)}</div>`).join("");
+      $("logs").scrollTop = $("logs").scrollHeight;
+      const finishedPreview = task.status === "completed" && task.phase === "preview";
+      $("delete-actions").classList.toggle("hidden", !finishedPreview || !task.selected);
+      if (finishedPreview) { lastPreview = task; $("delete-summary").textContent = `将删除 ${task.selected} 条，操作不可撤销。`; }
+      if (task.status === "error") { $("task-error").textContent = task.error || "任务失败"; $("task-error").classList.remove("hidden"); }
+      if (["completed", "cancelled", "error"].includes(task.status)) { clearInterval(pollTimer); $("preview-button").disabled = false; }
+    }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" })[char]); }
+    function pollTask() { api("/api/task/status").then(renderTask).catch((error) => { $("task-error").textContent = error.message; $("task-error").classList.remove("hidden"); }); }
+    async function startTask(confirm) {
+      $("task-error").classList.add("hidden"); $("delete-actions").classList.add("hidden"); $("preview-button").disabled = true;
+      try {
+        if (mode === "before" && !$("before-month").value) throw new Error("请选择月份");
+        if (mode === "range" && (!$("since").value || !$("until").value)) throw new Error("请选择开始日期和结束日期");
+        if (mode === "range" && $("since").value > $("until").value) throw new Error("开始日期不能晚于结束日期");
+        const uid = $("account-uid-input").value.trim();
+        if (!uid && $("account-uid-input").style.display !== "none") throw new Error("请补充微博 UID");
+        if (uid) await api("/api/login/uid", { method: "POST", body: JSON.stringify({ uid }) });
+        await api("/api/task/start", { method: "POST", body: JSON.stringify({ ...body(), confirm }) });
+        clearInterval(pollTimer); pollTimer = setInterval(pollTask, 850); pollTask();
+      }
+      catch (error) { $("preview-button").disabled = false; $("task-error").textContent = error.message; $("task-error").classList.remove("hidden"); }
+    }
+    $("preview-button").addEventListener("click", () => startTask(false));
+    $("delete-button").addEventListener("click", () => { if (lastPreview && confirm(`确认删除 ${lastPreview.selected} 条微博？\n\n删除后无法恢复。`)) startTask(true); });
+    startLoginPolling();
+  </script>
+</body>
+</html>

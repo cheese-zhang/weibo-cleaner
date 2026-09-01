@@ -1,0 +1,5 @@
+build/
+dist/
+ms-playwright/
+__pycache__/
+*.spec
