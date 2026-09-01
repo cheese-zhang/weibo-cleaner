@@ -8,7 +8,7 @@
 
 ## 普通用户使用（Windows）
 
-从 GitHub Releases 下载 `微博清理工具-Edge版.zip`，解压后双击 `微博清理工具.exe`。
+从 [Releases](https://github.com/Arthur-Miyano/weibo-cleaner/releases/latest) 下载 `微博清理工具-Edge版.zip`，解压后双击 `微博清理工具.exe`。
 
 - 无需安装 Python 或 Docker。
 - 电脑需要已安装 Microsoft Edge（Windows 10/11 默认自带）。
@@ -23,7 +23,7 @@
 
 需要你自己提供**已登录微博的 Cookie**，脚本并不存储或上传任何信息。
 
-## 安装
+## 从源码运行（开发者）
 
 1. 确保已安装 Python 3.9+。
 2. 安装依赖：
@@ -65,7 +65,7 @@ python weibo_cleanup.py --uid 7910373640 --cookie-file cookie.txt --since 2025-0
 
 > ⚠️ Cookie 是敏感信息，不要上传、截图或发送给他人。
 
-## 用法
+## 源码用法
 
 ### 推荐：打开本地 Web 界面
 
