@@ -10,6 +10,7 @@ import ctypes
 import hashlib
 import json
 import os
+import random
 import re
 import sys
 import threading
@@ -23,6 +24,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from weibo_cleanup import (
+    MAX_CONSECUTIVE_FAILURES,
     TZ_CN,
     WEIBO_LIST_URL,
     build_session,
@@ -382,11 +384,13 @@ def _cleanup_worker(task_id, uid, cookie, since, until, delay, confirm, cancel_e
             return
 
         xsrf_token = cookies["XSRF-TOKEN"]
+        consecutive = 0
         for index, post in enumerate(selected, 1):
             _check_cancel(cancel_event)
             post_id = post.get("idstr") or str(post.get("id") or "?")
             try:
                 delete_one(session, post, xsrf_token)
+                consecutive = 0
                 _update_task(task_id, current=index)
                 with STATE.lock:
                     if STATE.task:
@@ -398,8 +402,11 @@ def _cleanup_worker(task_id, uid, cookie, since, until, delay, confirm, cancel_e
                     if STATE.task:
                         STATE.task["failed"] = STATE.task.get("failed", 0) + 1
                 _append_log(task_id, f"第 {index} 条失败（{post_id}）：{str(exc)[:120]}")
+                consecutive += 1
+                if consecutive >= MAX_CONSECUTIVE_FAILURES:
+                    raise RuntimeError("连续删除失败，疑似被微博风控（418）或登录失效，已中止，请稍后再试")
             if index < len(selected):
-                time.sleep(delay)
+                time.sleep(delay + random.uniform(0, delay * 0.5))
         _update_task(task_id, status="completed", phase="done")
     except TaskCancelled:
         _update_task(task_id, status="cancelled", phase="cancelled")

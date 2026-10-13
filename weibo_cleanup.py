@@ -15,6 +15,7 @@
 """
 
 import argparse
+import random
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,9 @@ import requests
 
 WEIBO_LIST_URL = "https://weibo.com/ajax/statuses/mymblog"
 WEIBO_DESTROY_URL = "https://weibo.com/ajax/statuses/destroy"
+
+# 连续失败达到该次数（如 418 风控）就中止，避免继续冲击接口
+MAX_CONSECUTIVE_FAILURES = 3
 
 # 微博接口使用东八区
 TZ_CN = timezone(timedelta(hours=8))
@@ -307,6 +311,7 @@ Cookie 获取：
     xsrf_token = cookies["XSRF-TOKEN"]
     success = 0
     failed = 0
+    consecutive = 0
     for i, post in enumerate(selected, 1):
         idstr = post.get("idstr") or str(post.get("id"))
         dt = parse_weibo_time(post["created_at"]).strftime("%Y-%m-%d %H:%M")
@@ -314,13 +319,23 @@ Cookie 获取：
         try:
             delete_one(session, post, xsrf_token)
             success += 1
+            consecutive = 0
             print(f"[{i}/{len(selected)}] 已删除 {idstr} [{dt}] {text}")
         except Exception as e:
             failed += 1
+            consecutive += 1
             print(f"[{i}/{len(selected)}] 删除失败 {idstr} [{dt}]：{e}", file=sys.stderr)
+            if consecutive >= MAX_CONSECUTIVE_FAILURES:
+                print(
+                    f"\n连续失败 {consecutive} 次，疑似被微博风控（418）或登录失效，已中止。"
+                    "请稍后换网络/调大 --delay 再试。",
+                    file=sys.stderr,
+                )
+                print(f"已处理：成功 {success} 条，失败 {failed} 条。")
+                sys.exit(2)
 
         if i < len(selected):
-            time.sleep(args.delay)
+            time.sleep(args.delay + random.uniform(0, args.delay * 0.5))
 
     print(f"\n完成：成功 {success} 条，失败 {failed} 条。")
 
